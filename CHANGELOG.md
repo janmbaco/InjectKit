@@ -1,5 +1,11 @@
 # injectkit
 
+## 1.1.1
+
+### Patch Changes
+
+- fixing release
+
 ## 1.1.0
 
 ### Minor Changes
