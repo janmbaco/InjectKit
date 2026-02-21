@@ -1,10 +1,16 @@
 # injectkit
 
-## 1.1.1
+## 1.1.2
 
 ### Patch Changes
 
 - fixing release
+
+## 1.1.1
+
+### Patch Changes
+
+- adding claude skill
 
 ## 1.1.0
 
