@@ -38,3 +38,4 @@ jobs:
           publish: pnpm publish --tag ${{ inputs.tag || 'latest' }} --no-git-checks
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
