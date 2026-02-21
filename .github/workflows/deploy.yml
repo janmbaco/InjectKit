@@ -10,6 +10,10 @@ on:
 env:
   CI: true
 
+permissions:
+  id-token: write # Required for OIDC
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -34,4 +38,3 @@ jobs:
           publish: pnpm publish --tag ${{ inputs.tag || 'latest' }} --no-git-checks
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
