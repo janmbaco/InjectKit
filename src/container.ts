@@ -119,6 +119,16 @@ export class InjectKitContainer implements ScopedContainer, Container {
   }
 
   /**
+   * Checks if a service has a registration with the container.
+   * @template T The type of the service to check.
+   * @param id The identifier (constructor or abstract class) for the type to check.
+   * @returns True if the service has a registration, false otherwise.
+   */
+  public hasRegistration<T>(id: Identifier<T>): boolean {
+    return this.registrations.has(id);
+  }
+
+  /**
    * Creates a new scoped container that inherits all registrations from this container.
    * Scoped containers allow for per-scope instance management, where scoped services
    * are shared within a scope but isolated between different scopes.

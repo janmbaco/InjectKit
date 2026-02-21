@@ -120,6 +120,19 @@ describe('InjectKitContainer', () => {
     });
   });
 
+  describe('hasRegistration', () => {
+    it('should return true if the service has a registration', () => {
+      registry.register(DatabaseService).useClass(DatabaseService).asSingleton();
+      const container = registry.build();
+      expect(container.hasRegistration(DatabaseService)).toBe(true);
+    });
+
+    it('should return false if the service does not have a registration', () => {
+      const container = registry.build();
+      expect(container.hasRegistration(DatabaseService)).toBe(false);
+    });
+  });
+
   describe('singleton lifetime', () => {
     it('should return the same instance for singletons', () => {
       registry.register(DatabaseService).useClass(DatabaseService).asSingleton();

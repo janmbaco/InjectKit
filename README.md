@@ -276,6 +276,15 @@ Resolves an instance of the specified type.
 const service = container.get(MyService);
 ```
 
+#### `hasRegistration<T>(identifier): boolean`
+
+Checks if a service has a registration with the container.
+
+```typescript
+container.hasRegistration(MyService); // true
+container.hasRegistration(UnregisteredService); // false
+```
+
 #### `createScopedContainer(): ScopedContainer`
 
 Creates a child container for scoped instance management.

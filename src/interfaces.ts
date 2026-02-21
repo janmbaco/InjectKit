@@ -67,6 +67,14 @@ export abstract class Container {
    * @returns A new scoped container instance with this container as its parent.
    */
   abstract createScopedContainer(): ScopedContainer;
+
+  /**
+   * Checks if a service has a registration with the container.
+   * @template T The type of the service to check.
+   * @param id The identifier (constructor or abstract class) for the type to check.
+   * @returns True if the service has a registration, false otherwise.
+   */
+  abstract hasRegistration<T>(id: Identifier<T>): boolean;
 }
 
 /**
