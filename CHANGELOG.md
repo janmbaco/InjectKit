@@ -1,5 +1,11 @@
 # injectkit
 
+## 1.2.0
+
+### Minor Changes
+
+- updating to typescript 6
+
 ## 1.1.3
 
 ### Patch Changes
