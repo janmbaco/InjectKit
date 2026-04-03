@@ -21,6 +21,7 @@ coverage
 # Build Outputs
 dist
 bin
+plans
 
 
 # Debug

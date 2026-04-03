@@ -125,6 +125,12 @@ describe('InjectKitRegistry', () => {
       registry.register(AbstractService).useClass(ConcreteService).asSingleton();
       expect(registry.isRegistered(AbstractService)).toBe(true);
     });
+
+    it('should register a symbol token', () => {
+      const token = Symbol('SimpleService');
+      registry.register(token).useClass(SimpleService).asSingleton();
+      expect(registry.isRegistered(token)).toBe(true);
+    });
   });
 
   describe('remove', () => {
@@ -323,6 +329,22 @@ describe('InjectKitRegistry', () => {
       registry.register(SimpleService).useClass(SimpleService).asSingleton();
       const container = registry.build();
       expect(container.get(Container)).toBe(customContainer);
+    });
+
+    it('should apply build overrides last', () => {
+      registry.register(SimpleService).useClass(SimpleService).asSingleton();
+
+      class OverrideService extends SimpleService {
+        override getValue() {
+          return 'override';
+        }
+      }
+
+      const container = registry.build({
+        overrides: [{ token: SimpleService, useClass: OverrideService, lifetime: 'singleton' }],
+      });
+
+      expect(container.get(SimpleService).getValue()).toBe('override');
     });
   });
 

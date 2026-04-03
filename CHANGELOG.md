@@ -1,4 +1,10 @@
-# injectkit
+# @janmbaco/injectkit
+
+## 1.2.0-jan.0
+
+### Patch Changes
+
+- re-scope package metadata and documentation for the Jan Baco fork
 
 ## 1.2.0
 

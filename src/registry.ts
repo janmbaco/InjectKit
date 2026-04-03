@@ -1,140 +1,205 @@
-import 'reflect-metadata';
 import {
+  Abstract,
+  ArrayType,
+  BuildOptions,
+  Container,
   Constructor,
   Factory,
-  Identifier,
-  Instance,
   Lifetime,
-  RegistrationType,
-  Container,
-  Abstract,
-  RegistrationLifeTime,
-  Registry,
-  ArrayType,
-  RegistrationArray,
   MapType,
+  Override,
+  RegistrationArray,
+  RegistrationLifeTime,
   RegistrationMap,
+  RegistrationType,
+  Registry,
+  Token,
 } from './interfaces.js';
 import { InjectKitContainer } from './container.js';
 import { Registration } from './internal.js';
+import { getDefaultMetadataRegistry, MetadataRegistry } from './metadata.js';
+import { formatToken } from './token.js';
 
 /**
  * Registry implementation for managing service registrations.
  * Allows registration of services with various creation strategies (class, factory, instance)
  * and lifetime management (singleton, transient, scoped).
- * Validates registrations for missing dependencies, circular dependencies, and tag conflicts
- * before building the container.
  */
 export class InjectKitRegistry implements Registry {
-  /** Internal map storing all service registrations by their identifier. */
-  private readonly registrations: Map<Identifier<unknown>, InjectKitRegistration<unknown>> = new Map();
+  private readonly registrations: Map<Token<unknown>, InjectKitRegistration<unknown>> = new Map();
 
-  /**
-   * Registers a service with the registry.
-   * @template T The type of the service to register.
-   * @param id The identifier (constructor or abstract class) for the type to register.
-   * @returns The registration type for configuring how the service should be created.
-   * @throws {Error} If a registration for the given identifier already exists.
-   */
-  public register<T>(id: Identifier<T>): RegistrationType<T> {
-    if (this.registrations.has(id)) {
-      throw new Error(`Registration for ${id.name} already exists`);
+  constructor(private readonly metadataRegistry: MetadataRegistry = getDefaultMetadataRegistry()) {}
+
+  public register<T>(token: Token<T>): RegistrationType<T> {
+    if (this.registrations.has(token)) {
+      throw new Error(`Registration for ${formatToken(token)} already exists`);
     }
-    const registration = new InjectKitRegistration<T>();
-    this.registrations.set(id, registration);
 
+    const registration = new InjectKitRegistration<T>(this.metadataRegistry);
+    this.registrations.set(token, registration);
     return registration;
   }
 
-  /**
-   * Removes a service registration from the registry.
-   * @template T The type of the service to remove.
-   * @param id The identifier (constructor or abstract class) for the type to remove.
-   * @throws {Error} If the registration for the given identifier is not found.
-   */
-  public remove<T>(id: Identifier<T>): void {
-    if (!this.registrations.delete(id)) {
-      throw new Error(`Registration for ${id.name} not found`);
+  public registerValue<T>(token: Token<T>, value: T): this {
+    this.register(token).useInstance(value);
+    return this;
+  }
+
+  public registerFactory<T>(token: Token<T>, factory: Factory<T>, lifetime: Lifetime = 'transient'): this {
+    const registration = this.register(token).useFactory(factory);
+    if (lifetime === 'singleton') {
+      registration.asSingleton();
+    } else if (lifetime === 'scoped') {
+      registration.asScoped();
+    } else {
+      registration.asTransient();
+    }
+
+    return this;
+  }
+
+  public remove<T>(token: Token<T>): void {
+    if (!this.registrations.delete(token)) {
+      throw new Error(`Registration for ${formatToken(token)} not found`);
     }
   }
 
-  /**
-   * Checks if a service is registered with the registry.
-   * @template T The type of the service to check.
-   * @param id The identifier (constructor or abstract class) for the type to check.
-   * @returns True if the service is registered, false otherwise.
-   */
-  public isRegistered<T>(id: Identifier<T>): boolean {
-    return this.registrations.has(id);
+  public isRegistered<T>(token: Token<T>): boolean {
+    return this.registrations.has(token);
   }
 
-  /**
-   * Verifies that all dependencies for registered services are also registered.
-   * @param registrations Map of all registrations to verify.
-   * @throws {Error} If any service has dependencies that are not registered.
-   */
-  private static verifyRegistrations(registrations: Map<Identifier<unknown>, Registration<unknown>>) {
-    const missingDependencies: string[] = [];
+  private static verifyRegistrations(registrations: Map<Token<unknown>, Registration<unknown>>) {
+    for (const [token, config] of registrations.entries()) {
+      const missingDependencies: string[] = [];
 
-    for (const [id, config] of registrations.entries()) {
       for (const dependency of config.dependencies) {
         if (!registrations.has(dependency)) {
-          missingDependencies.push(dependency.name);
+          missingDependencies.push(formatToken(dependency));
         }
       }
 
       if (missingDependencies.length > 0) {
-        throw new Error(`Missing dependencies for ${id.name}: ${missingDependencies.join(', ')}`);
+        throw new Error(
+          `Missing dependencies for ${formatToken(token)}: ${missingDependencies.join(', ')}`,
+        );
       }
     }
   }
 
-  /**
-   * Verifies that there are no circular dependencies in the registration graph.
-   * Uses depth-first search to detect cycles in the dependency graph.
-   * @param registrations Map of all registrations to verify.
-   * @throws {Error} If a circular dependency is detected.
-   */
-  private static verifyNoCircularDependencies(registrations: Map<Identifier<unknown>, Registration<unknown>>) {
-    /**
-     * Recursively checks for circular dependencies starting from a given identifier.
-     * @param id The identifier to check for circular dependencies.
-     * @param registration The registration configuration for the identifier.
-     * @param dependencies The path of dependencies traversed so far (for error reporting).
-     */
-    const checkCircularDependencies = (id: Identifier<unknown>, registration: Registration<unknown>, dependencies: string[]) => {
+  private static verifyNoCircularDependencies(registrations: Map<Token<unknown>, Registration<unknown>>) {
+    const checkCircularDependencies = (
+      token: Token<unknown>,
+      registration: Registration<unknown>,
+      dependencies: string[],
+    ) => {
       for (const dependency of registration.dependencies) {
-        if (id === dependency) {
-          throw new Error(`Circular dependency found: ${[id.name, ...dependencies, id.name].join(' -> ')}`);
+        if (token === dependency) {
+          throw new Error(
+            `Circular dependency found: ${[
+              formatToken(token),
+              ...dependencies,
+              formatToken(token),
+            ].join(' -> ')}`,
+          );
         }
 
         const dependencyRegistration = registrations.get(dependency);
         if (dependencyRegistration && dependencyRegistration.dependencies.length > 0) {
-          checkCircularDependencies(id, dependencyRegistration, [...dependencies, dependency.name]);
+          checkCircularDependencies(token, dependencyRegistration, [
+            ...dependencies,
+            formatToken(dependency),
+          ]);
         }
       }
     };
 
-    for (const [id, config] of registrations.entries()) {
-      checkCircularDependencies(id, config, []);
+    for (const [token, config] of registrations.entries()) {
+      checkCircularDependencies(token, config, []);
     }
   }
 
-  /**
-   * Builds a container from all registered services.
-   * Performs validation checks for missing dependencies and circular dependencies.
-   * @returns A configured container instance ready to resolve services.
-   * @throws {Error} If validation fails (missing dependencies, circular dependencies).
-   */
-  public build(): Container {
-    const registrations = new Map<Identifier<unknown>, Registration<unknown>>();
+  private createRegistrationFromClass(
+    token: Token<unknown>,
+    constructor: Constructor<unknown>,
+    lifetime?: Lifetime,
+  ): Registration<unknown> {
+    const registration = new InjectKitRegistration<unknown>(this.metadataRegistry);
+    registration.useClass(constructor);
 
-    for (const [id, registration] of this.registrations.entries()) {
-      const config = registration.build();
-      registrations.set(id, config);
+    if (lifetime === 'singleton') {
+      registration.asSingleton();
+    } else if (lifetime === 'scoped') {
+      registration.asScoped();
+    } else if (lifetime === 'transient') {
+      registration.asTransient();
     }
 
-    if (!this.isRegistered(Container)) {
+    return registration.build();
+  }
+
+  private createRegistrationFromOverride(override: Override): Registration<unknown> {
+    if ('useValue' in override) {
+      return {
+        constructor: undefined,
+        factory: undefined,
+        instance: override.useValue,
+        lifetime: 'singleton',
+        dependencies: [],
+        ctorDependencies: [],
+        collectionDependencies: undefined,
+      };
+    }
+
+    if ('useFactory' in override) {
+      return {
+        constructor: undefined,
+        factory: override.useFactory,
+        instance: undefined,
+        lifetime: override.lifetime ?? 'transient',
+        dependencies: [],
+        ctorDependencies: [],
+        collectionDependencies: undefined,
+      };
+    }
+
+    return this.createRegistrationFromClass(
+      override.token,
+      override.useClass,
+      override.lifetime,
+    );
+  }
+
+  private applyDecoratedRegistrations(registrations: Map<Token<unknown>, Registration<unknown>>): void {
+    for (const target of this.metadataRegistry.getDecoratedClasses()) {
+      const metadata = this.metadataRegistry.getServiceMetadata(target);
+      if (!metadata?.injectable) {
+        continue;
+      }
+
+      const token = metadata.provide ?? target;
+      if (registrations.has(token)) {
+        continue;
+      }
+
+      registrations.set(
+        token,
+        this.createRegistrationFromClass(token, target as Constructor<unknown>, metadata.lifetime),
+      );
+    }
+  }
+
+  public build(options: BuildOptions = {}): Container {
+    const registrations = new Map<Token<unknown>, Registration<unknown>>();
+
+    for (const [token, registration] of this.registrations.entries()) {
+      registrations.set(token, registration.build());
+    }
+
+    if (options.autoRegisterDecorated) {
+      this.applyDecoratedRegistrations(registrations);
+    }
+
+    if (!registrations.has(Container)) {
       registrations.set(Container, {
         lifetime: 'singleton',
         dependencies: [],
@@ -146,6 +211,10 @@ export class InjectKitRegistry implements Registry {
       });
     }
 
+    for (const override of options.overrides ?? []) {
+      registrations.set(override.token, this.createRegistrationFromOverride(override));
+    }
+
     InjectKitRegistry.verifyRegistrations(registrations);
     InjectKitRegistry.verifyNoCircularDependencies(registrations);
 
@@ -154,231 +223,83 @@ export class InjectKitRegistry implements Registry {
 }
 
 /**
- * Internal registration builder that implements the fluent registration API.
- * Allows chaining of configuration methods to set up how a service should be created
- * and managed.
- * @template T The type being registered.
- * @internal
+ * Creates a registry with the shared metadata registry.
+ * @returns A new registry instance.
  */
-class InjectKitRegistration<T> implements RegistrationType<T>, RegistrationLifeTime, RegistrationArray<T>, RegistrationMap<unknown, T> {
-  /** Optional constructor function for class-based registration. */
-  private ctor: Constructor<T> | undefined = undefined;
-  /** Optional factory function for factory-based registration. */
-  private factory: Factory<T> | undefined = undefined;
-  /** Optional instance for instance-based registration. */
-  private instance: Instance<T> | undefined = undefined;
-  /** Optional collection of identifiers for array-based registration. */
-  private collection: Array<Identifier<T>> | undefined = undefined;
-  /** Optional collection of identifiers for map-based registration. */
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-  private map: Map<any, Identifier<T>> | undefined = undefined;
-  /** The lifetime management strategy for this registration. */
-  private lifetime: Lifetime = 'transient';
+export const createRegistry = (): InjectKitRegistry => new InjectKitRegistry();
 
-  /**
-   * Registers a service using a constructor class.
-   * @param constructor The constructor function to use for creating instances.
-   * @returns Registration lifetime options for further configuration.
-   */
+class InjectKitRegistration<T>
+  implements RegistrationType<T>, RegistrationLifeTime, RegistrationArray<T>, RegistrationMap<unknown, T>
+{
+  private ctor: Constructor<T> | undefined = undefined;
+  private factory: Factory<T> | undefined = undefined;
+  private instance: T | undefined = undefined;
+  private collection: Array<Token<T>> | undefined = undefined;
+  private map: Map<unknown, Token<T>> | undefined = undefined;
+  private lifetime: Lifetime = 'transient';
+  private lifetimeConfigured = false;
+
+  constructor(private readonly metadataRegistry: MetadataRegistry) {}
+
   useClass(constructor: Constructor<T>): RegistrationLifeTime {
     this.ctor = constructor;
     return this;
   }
 
-  /**
-   * Registers a service using a factory function.
-   * @param factory The factory function that creates instances using the container.
-   * @returns Registration lifetime options for further configuration.
-   */
   useFactory(factory: Factory<T>): RegistrationLifeTime {
     this.factory = factory;
     return this;
   }
 
-  /**
-   * Registers a service using an existing instance.
-   * @param instance The instance to register (will be used as a singleton).
-   */
-  useInstance(instance: Instance<T>): void {
+  useInstance(instance: T): void {
     this.instance = instance;
     this.lifetime = 'singleton';
+    this.lifetimeConfigured = true;
   }
 
-  /**
-   * Registers a service as an array type, allowing multiple implementations to be collected.
-   * Use this when you need to register a service that extends Array and collect multiple implementations.
-   * The array will be populated with instances resolved from the identifiers added via push().
-   * @template U The array element type extracted from T.
-   * @param constructor The constructor function for the array type (must extend Array).
-   * @returns Registration array options for chaining push() calls to add implementations.
-   * @example
-   * ```typescript
-   * @Injectable()
-   * class NotificationService extends Array<Notifier> {}
-   *
-   * registry.register(NotificationService)
-   *     .useArray(NotificationService)
-   *     .push(EmailNotifier)
-   *     .push(SmsNotifier);
-   * ```
-   */
   useArray<U extends ArrayType<T>>(constructor: Constructor<T>): RegistrationArray<U> {
     this.collection = [];
     this.ctor = constructor;
     return this as unknown as RegistrationArray<U>;
   }
 
-  /**
-   * Registers a service as a map type, allowing multiple implementations to be collected.
-   * Use this when you need to register a service that extends Map and collect multiple implementations.
-   * The map will be populated with instances resolved from the identifiers added via set().
-   * @template U The map element type extracted from T.
-   * @param constructor The constructor function for the map type (must extend Map).
-   * @returns Registration map options for chaining set() calls to add implementations.
-   * @example
-   * ```typescript
-   * @Injectable()
-   * class ServiceMap extends Map<string, AbstractService> {}
-   *
-   * registry.register(ServiceMap)
-   *     .useMap(ServiceMap)
-   *     .set('email', EmailService)
-   *     .set('sms', SmsService);
-   * ```
-   */
   useMap<U extends MapType<T>>(constructor: Constructor<T>): RegistrationMap<U[0], U[1]> {
     this.map = new Map();
     this.ctor = constructor;
     return this as unknown as RegistrationMap<U[0], U[1]>;
   }
 
-  /**
-   * Sets the lifetime to singleton (one instance shared across the container).
-   */
   asSingleton(): void {
     this.lifetime = 'singleton';
+    this.lifetimeConfigured = true;
   }
 
-  /**
-   * Sets the lifetime to transient (new instance created each time).
-   */
   asTransient(): void {
     this.lifetime = 'transient';
+    this.lifetimeConfigured = true;
   }
 
-  /**
-   * Sets the lifetime to scoped (one instance per scoped container).
-   */
   asScoped(): void {
     this.lifetime = 'scoped';
+    this.lifetimeConfigured = true;
   }
 
-  /**
-   * Adds an implementation identifier to the array collection.
-   * Can be called multiple times to add multiple implementations.
-   * The resolved instance will be pushed to the array when the service is created.
-   * @param id The identifier of the implementation to add to the array.
-   * @returns Registration array options for method chaining.
-   * @example
-   * ```typescript
-   * registry.register(NotificationService)
-   *     .useArray(NotificationService)
-   *     .push(EmailNotifier)
-   *     .push(SmsNotifier);
-   * ```
-   */
-  push(id: Identifier<T>): RegistrationArray<T> {
-    this.collection!.push(id);
+  push(token: Token<T>): RegistrationArray<T> {
+    this.collection!.push(token);
     return this;
   }
 
-  /**
-   * Adds an implementation identifier to the map collection.
-   * The resolved instance will be stored in the map with the provided key when the service is created.
-   * @param key The key of the implementation to add to the map.
-   * @param id The identifier of the implementation to add to the map.
-   * @returns Registration map options for method chaining.
-   * @example
-   * ```typescript
-   * registry.register(ServiceMap)
-   *     .useMap(ServiceMap)
-   *     .set('email', EmailService)
-   *     .set('sms', SmsService);
-   * ```
-   */
-  set(key: unknown, id: Identifier<T>): RegistrationMap<unknown, T> {
-    this.map!.set(key, id);
+  set(key: unknown, token: Token<T>): RegistrationMap<unknown, T> {
+    this.map!.set(key, token);
     return this;
   }
 
-  /**
-   * Gets the base class of a given target class by inspecting its prototype chain.
-   * @template T The type of the target.
-   * @template B The type of the base class.
-   * @param target The abstract class or constructor to get the base class for.
-   * @returns The base class constructor, or undefined if the target extends Object directly.
-   */
-  private static getBaseClass<T extends B, B>(target: Abstract<T>) {
-    const baseClass = Object.getPrototypeOf(target.prototype).constructor;
-    if (baseClass === Object) {
-      return undefined;
-    }
-
-    return baseClass;
-  }
-
-  /**
-   * Extracts dependencies from a constructor using reflection metadata.
-   * Handles inheritance by checking base classes if the current class has no dependencies.
-   * Special handling for classes extending Array or Map - these don't require constructor dependency checks.
-   * @template T The type of the target.
-   * @param target The constructor or abstract class to extract dependencies from.
-   * @param parents Array of parent class names for error reporting in case of missing decorators.
-   * @returns Array of dependency identifiers.
-   * @throws {Error} If the service is not properly decorated with dependency injection metadata.
-   */
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-  private static getDependencies<T>(target: Abstract<T>, parents: string[]): any {
-    const dependencies = Reflect.getMetadata('design:paramtypes', target) ?? [];
-
-    if (dependencies.length < target.length) {
-      throw new Error(`Service not decorated: ${[...parents, target.name].join(' -> ')}`);
-    }
-
-    if (dependencies.length > 0) {
-      return dependencies;
-    }
-
-    // If the target has a constructor with no parameters, return an empty array
-    if (target.length > 0) {
-      return [];
-    }
-    // Special handling for classes extending Array or Map - they don't need constructor dependencies
-    const baseClass = this.getBaseClass(target);
-    if (baseClass === Array || baseClass === Map) {
-      return [];
-    } else if (baseClass) {
-      return this.getDependencies(baseClass, [...parents, target.name]);
-    }
-
-    return [];
-  }
-
-  /**
-   * Builds the final registration configuration from the current builder state.
-   * Extracts dependencies from the constructor if one is registered.
-   * @returns A complete registration configuration object.
-   */
   build(): Registration<T> {
-    let ctorDependencies = [];
-
-    // if (this._collection) {
-    //     dependencies = this._collection;
-    // } else if (this._map) {
-    //     dependencies = Array.from(this._map);
-    // } else
+    let ctorDependencies: Token<unknown>[] = [];
     if (this.ctor) {
-      ctorDependencies = InjectKitRegistration.getDependencies(this.ctor, []);
+      ctorDependencies = this.metadataRegistry.getConstructorDependencies(
+        this.ctor as unknown as Abstract<unknown>,
+      );
     }
 
     const dependencies = [...ctorDependencies];
@@ -388,13 +309,20 @@ class InjectKitRegistration<T> implements RegistrationType<T>, RegistrationLifeT
       dependencies.push(...Array.from(this.map.values()));
     }
 
+    const lifetime =
+      !this.lifetimeConfigured && this.ctor
+        ? (this.metadataRegistry.getServiceMetadata(
+            this.ctor as unknown as Abstract<unknown>,
+          )?.lifetime ?? this.lifetime)
+        : this.lifetime;
+
     return {
       constructor: this.ctor,
       factory: this.factory,
       instance: this.instance,
-      lifetime: this.lifetime,
-      dependencies: dependencies,
-      ctorDependencies: ctorDependencies,
+      lifetime,
+      dependencies,
+      ctorDependencies,
       collectionDependencies: this.collection ?? this.map,
     };
   }

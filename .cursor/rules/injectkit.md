@@ -2,214 +2,151 @@
 
 ## Project Overview
 
-InjectKit is a lightweight, type-safe dependency injection (DI) container for TypeScript. It uses decorators and `reflect-metadata` for constructor parameter extraction.
+InjectKit is a lightweight, type-safe DI container for TypeScript, published as `@janmbaco/injectkit`.
+
+Core direction:
+
+- no static runtime container
+- explicit composition root
+- useful decorators
+- build-time validation
+- tokens support `class | abstract class | string | symbol`
 
 ## Architecture
 
 ### Core Components
 
-- **Registry** (`InjectKitRegistry`): Configuration phase where services are registered before building a container
-- **Container** (`InjectKitContainer`): Runtime phase that resolves and manages service instances
-- **Identifier**: A class constructor or abstract class used as a key to register and resolve services
-- **Registration**: Internal representation of how a service should be created and its lifetime
+- **Registry** (`InjectKitRegistry`): registration and composition phase
+- **Container** (`InjectKitContainer`): runtime resolution phase
+- **MetadataRegistry**: shared metadata backend used by decorators and `build()`
+- **Token**: runtime key for service registration and resolution
+- **Registration**: internal normalized definition for service construction and lifetime
 
 ### File Structure
 
 ```
 src/
-├── index.ts        # Public exports
-├── injectable.ts   # @Injectable() decorator
-├── interfaces.ts   # Public types and abstract Container class
-├── registry.ts     # InjectKitRegistry and InjectKitRegistration classes
-├── container.ts    # InjectKitContainer implementation
-└── internal.ts     # Internal types (Registration)
+├── index.ts
+├── injectable.ts
+├── interfaces.ts
+├── metadata.ts
+├── token.ts
+├── registry.ts
+├── container.ts
+└── internal.ts
+```
+
+## API Model
+
+Use this mental model consistently:
+
+- decorators describe
+- registry composes
+- `build()` materializes and validates
+
+That means:
+
+- decorators do not register directly into a runtime container
+- registry decides what enters the system explicitly
+- `build()` merges explicit registrations, metadata-driven registrations, and overrides
+
+## Public API Expectations
+
+Preferred patterns:
+
+```ts
+registry.register(Service).useClass(Service).asSingleton();
+registry.registerValue(CONFIG, value);
+registry.registerFactory(TOKEN, container => new Service(), 'singleton');
+```
+
+Decorator-driven patterns are valid:
+
+```ts
+@Singleton()
+class Logger {}
+
+@Injectable()
+class UserService {
+  constructor(private readonly logger: Logger) {}
+}
+
+const container = createRegistry().build({
+  autoRegisterDecorated: true,
+});
+```
+
+Token-driven contracts are first-class:
+
+```ts
+const LOGGER = Symbol('LOGGER');
+
+@Singleton()
+@Provides(LOGGER)
+class ConsoleLogger {}
+```
+
+Overrides belong in `build()`:
+
+```ts
+const container = createRegistry().build({
+  autoRegisterDecorated: true,
+  overrides: [{ token: LOGGER, useClass: TestLogger, lifetime: 'singleton' }],
+});
 ```
 
 ## Code Conventions
 
-### TypeScript
-
 - Use strict TypeScript with `strict: true`
-- Enable decorators: `experimentalDecorators` and `emitDecoratorMetadata`
-- Use ES modules with `.js` extensions in imports (NodeNext resolution)
-- Prefer `interface` for public APIs, `type` for internal/complex types
-- Use generics extensively for type safety
-
-### Naming
-
-- Classes: `PascalCase` (e.g., `InjectKitRegistry`, `InjectKitContainer`)
-- Interfaces: `PascalCase`, no `I` prefix (e.g., `Constructor`, `Registry`)
-- Type aliases: `PascalCase` (e.g., `Identifier<T>`, `Lifetime`)
-- Static methods: `camelCase` (e.g., `getDependencies`, `getBaseClass`)
-
-### Documentation
-
-- Use JSDoc comments on all public APIs
-- Include `@template`, `@param`, `@returns`, `@throws`, `@example` tags
-- Mark internal APIs with `@internal`
-- Use `@remarks` for additional context
-
-### Code Style
-
-- Use Prettier for formatting
-- Prefer `const` over `let`
-- Use arrow functions for callbacks
-- Avoid `any` when possible (warn level in ESLint)
-- Return early for guard clauses
+- Use decorators with `experimentalDecorators` and `emitDecoratorMetadata`
+- Use ES modules with `.js` extensions in imports
+- Prefer explicit, readable APIs over clever overloads
+- Keep the runtime small and predictable
+- Avoid `any` when possible
+- Prefer early returns and small helper functions
 
 ## Lifetimes
 
-Three lifetime strategies are supported:
+Only these lifetimes are supported:
 
-- **singleton**: One instance shared across all containers (stored in root container)
-- **transient**: New instance created on every `get()` call (never cached)
-- **scoped**: One instance per scope, inherited by child scopes (stored in creating container)
+- `singleton`
+- `transient`
+- `scoped`
 
-## Registration Patterns
+Do not introduce new lifetimes to solve strategy-selection problems.
+Multiple implementations of the same abstraction must be modeled with:
 
-### Class Registration
-
-```typescript
-registry.register(ServiceClass).useClass(ServiceClass).asSingleton();
-```
-
-### Factory Registration
-
-```typescript
-registry
-  .register(ServiceClass)
-  .useFactory(container => {
-    return new ServiceClass(container.get(Dependency));
-  })
-  .asSingleton();
-```
-
-### Instance Registration
-
-```typescript
-registry.register(ServiceClass).useInstance(existingInstance);
-// Always singleton - no lifetime method needed
-```
-
-### Array Collection
-
-```typescript
-registry.register(ServiceArray).useArray(ServiceArray).push(ImplA).push(ImplB);
-// Resolves to array containing [ImplA instance, ImplB instance]
-```
-
-### Map Collection
-
-```typescript
-registry.register(ServiceMap).useMap(ServiceMap).set('key1', ImplA).set('key2', ImplB);
-// Resolves to Map with entries { 'key1' => ImplA instance, 'key2' => ImplB instance }
-```
+- tokens
+- collections
+- factories
+- explicit composition root wiring
 
 ## Dependency Resolution
 
-- Dependencies are extracted via `reflect-metadata` from constructor parameters
-- All classes using `useClass()` MUST be decorated with `@Injectable()`
-- The registry validates for missing dependencies and circular dependencies on `build()`
-- The `Container` itself is auto-registered and can be injected
+- Constructor dependencies are read through the library metadata layer
+- Decorated classes participate in metadata-driven auto-registration
+- Explicit registrations override metadata-driven registrations
+- Build overrides override both
+- `Container` is auto-registered unless explicitly replaced
 
 ## Testing
 
-- Use Vitest for testing
-- Test files in `tests/` directory with `.test.ts` extension
-- Tests use SWC for faster compilation with decorator support
-- Setup file at `tests/setup.ts` imports `reflect-metadata`
+- Use Vitest
+- Test files live in `tests/` and use `.test.ts`
+- Prefer testing through public APIs
+- Cover:
+  - explicit registration
+  - decorator-driven registration
+  - string/symbol tokens
+  - overrides
+  - missing dependency validation
+  - circular dependency validation
 
-## Common Patterns
+## Design Guardrails
 
-### Abstract Class Pattern
-
-Register abstract classes with concrete implementations:
-
-```typescript
-abstract class Repository {
-  abstract find(id: string): any;
-}
-
-@Injectable()
-class UserRepository extends Repository {
-  find(id: string) {
-    return null;
-  }
-}
-
-registry.register(Repository).useClass(UserRepository).asSingleton();
-```
-
-### Scoped Container Pattern
-
-Create child containers for request/operation scoping:
-
-```typescript
-const requestContainer = rootContainer.createScopedContainer();
-// Scoped services are shared within this container
-// Singletons are shared with parent
-```
-
-### Override Pattern
-
-Override registrations in scoped containers:
-
-```typescript
-const scoped = container.createScopedContainer();
-scoped.override(SomeService, mockInstance);
-```
-
-## Build & Scripts
-
-- `pnpm build`: Build with tsup (ESM format)
-- `pnpm test`: Run Vitest tests
-- `pnpm lint`: Run ESLint
-- `pnpm check`: Format with Prettier and fix ESLint issues
-
-## Key Implementation Details
-
-### Singleton Instance Storage
-
-Singletons traverse up to root container before storing:
-
-```typescript
-if (registration.lifetime === 'singleton') {
-  let container = this;
-  while (container._parent) {
-    container = container._parent;
-  }
-  container._instances.set(id, instance);
-}
-```
-
-### Scoped Instance Lookup
-
-Scoped instances traverse up the hierarchy to find cached instances:
-
-```typescript
-private getScopedInstance<T>(id: Identifier<T>): T {
-    const instance = this._instances.get(id) as T;
-    if (!instance && this._parent) {
-        return this._parent.getScopedInstance(id);
-    }
-    return instance;
-}
-```
-
-### Dependency Extraction
-
-Uses reflection metadata with inheritance chain traversal:
-
-- Checks `design:paramtypes` metadata
-- Validates decorator presence
-- Handles special cases for Array/Map base classes
-
-## Error Messages
-
-The library provides clear error messages:
-
-- `"Registration for X already exists"` - Duplicate registration
-- `"Registration for X not found"` - Missing registration on resolve
-- `"Missing dependencies for X: Y, Z"` - Unregistered dependencies
-- `"Circular dependency found: A -> B -> A"` - Circular dependency chain
-- `"Service not decorated: X"` - Missing `@Injectable()` decorator
+- No global runtime container
+- No filesystem scanning
+- No module auto-loading
+- No name-matching dependency resolution
+- Keep explicit registration available at all times
+- Keep build-time validation as a core feature

@@ -1,6 +1,6 @@
 # InjectKit
 
-[![codecov](https://codecov.io/github/MaroonedSoftware/InjectKit/graph/badge.svg?token=suXBzveqVf)](https://codecov.io/github/MaroonedSoftware/InjectKit)
+[![Repository](https://img.shields.io/badge/github-janmbaco%2FInjectKit-181717?logo=github)](https://github.com/janmbaco/InjectKit)
 
 ---
 
@@ -22,7 +22,7 @@
 ## Features
 
 - 🎯 **Type-safe** — Full TypeScript support with strong typing throughout
-- 🪶 **Lightweight** — Minimal footprint with zero dependencies (except `reflect-metadata`)
+- 🪶 **Lightweight** — Minimal footprint with zero runtime dependencies
 - 🔄 **Multiple lifetimes** — Singleton, transient, and scoped instance management
 - 🏭 **Flexible registration** — Classes, factories, or existing instances
 - 📦 **Collection support** — Register arrays and maps of implementations
@@ -32,15 +32,15 @@
 ## Installation
 
 ```bash
-npm install injectkit reflect-metadata
+npm install @janmbaco/injectkit
 ```
 
 ```bash
-pnpm add injectkit reflect-metadata
+pnpm add @janmbaco/injectkit
 ```
 
 ```bash
-yarn add injectkit reflect-metadata
+yarn add @janmbaco/injectkit
 ```
 
 ## Requirements
@@ -57,17 +57,12 @@ yarn add injectkit reflect-metadata
 }
 ```
 
-- Import `reflect-metadata` **once** at your application entry point:
-
-```typescript
-import 'reflect-metadata';
-```
+- No `reflect-metadata` import is required at application entry point.
 
 ## Quick Start
 
 ```typescript
-import 'reflect-metadata';
-import { Injectable, InjectKitRegistry, Container } from 'injectkit';
+import { Injectable, InjectKitRegistry, Container } from '@janmbaco/injectkit';
 
 // 1. Decorate your classes with @Injectable()
 @Injectable()
@@ -134,9 +129,9 @@ const service = container.get(MyService);
 const container = container.get(Container);
 ```
 
-### Identifier
+### Token
 
-An **Identifier** is a class constructor or abstract class used to register and resolve services. This enables programming to interfaces:
+A **Token** is a class constructor, abstract class, string, or symbol used to register and resolve services. This enables programming to abstractions and nominal contracts:
 
 ```typescript
 // Abstract class as identifier
