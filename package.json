@@ -39,6 +39,7 @@
       "import": "./dist/browser/injectkit.js",
       "default": "./dist/browser/injectkit.js"
     },
+    "./dist/*": "./dist/*",
     "./package.json": "./package.json"
   },
   "license": "MIT",
@@ -60,6 +61,9 @@
     "test": "vitest run",
     "test:browser": "pnpm run build:browser && node tests/browser/browser-ready-smoke.mjs",
     "test:ci": "vitest run --coverage && pnpm run test:browser"
+  },
+  "dependencies": {
+    "reflect-metadata": "^0.2.2"
   },
   "devDependencies": {
     "@changesets/cli": "^2.30.0",

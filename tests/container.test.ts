@@ -16,7 +16,7 @@ class LoggerService {
   }
 }
 
-@Injectable({ deps: [DatabaseService, LoggerService] })
+@Injectable()
 class UserService {
   constructor(
     public db: DatabaseService,

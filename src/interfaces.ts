@@ -174,7 +174,8 @@ export interface RegistrationMap<K, V> {
 export interface RegistrationType<T> {
   /**
    * Registers a service using a constructor class.
-   * Constructor dependencies are read from explicit decorator metadata.
+   * Constructor dependencies are read from explicit decorator metadata first,
+   * then from legacy reflect metadata when explicit deps are absent.
    * @param constructor The constructor function to use for creating instances.
    * @returns Registration lifetime options for further configuration.
    */

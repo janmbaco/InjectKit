@@ -9,7 +9,7 @@ class SimpleService {
   }
 }
 
-@Injectable({ deps: [SimpleService] })
+@Injectable()
 class DependentService {
   constructor(public simple: SimpleService) {}
 
@@ -18,7 +18,7 @@ class DependentService {
   }
 }
 
-@Injectable({ deps: [DependentService] })
+@Injectable()
 class DeepDependentService {
   constructor(public dependent: DependentService) {}
 
@@ -389,7 +389,7 @@ describe('InjectKitRegistry', () => {
   });
 
   describe('dependency resolution', () => {
-    it('should resolve simple dependencies', () => {
+    it('should resolve simple dependencies using legacy reflect metadata', () => {
       registry.register(SimpleService).useClass(SimpleService).asSingleton();
       registry.register(DependentService).useClass(DependentService).asSingleton();
       const container = registry.build();
@@ -405,6 +405,29 @@ describe('InjectKitRegistry', () => {
       const deep = container.get(DeepDependentService);
       expect(deep.getValue()).toBe('deep-dependent-simple');
     });
+
+    it('should prefer explicit deps over legacy reflect metadata', () => {
+      @Injectable()
+      class ReflectDependency {
+        readonly source = 'reflect';
+      }
+
+      @Injectable()
+      class ExplicitDependency {
+        readonly source = 'explicit';
+      }
+
+      @Injectable({ deps: [ExplicitDependency] })
+      class ExplicitService {
+        constructor(public dependency: ReflectDependency) {}
+      }
+
+      registry.register(ExplicitDependency).useClass(ExplicitDependency).asSingleton();
+      registry.register(ExplicitService).useClass(ExplicitService).asSingleton();
+
+      const container = registry.build();
+      expect(container.get(ExplicitService).dependency).toBeInstanceOf(ExplicitDependency);
+    });
   });
 
   describe('decorator validation', () => {
@@ -415,7 +438,7 @@ describe('InjectKitRegistry', () => {
 
       registry.register(SimpleService).useClass(SimpleService).asSingleton();
       registry.register(UndecoratedService).useClass(UndecoratedService).asSingleton();
-      expect(() => registry.build()).toThrow(/Service dependencies not declared/);
+      expect(() => registry.build()).toThrow(/Declare deps with @Injectable/);
     });
 
     it('should allow undecorated class with no dependencies', () => {

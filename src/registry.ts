@@ -449,8 +449,9 @@ class InjectKitRegistration<T>
 
   /**
    * Builds a normalized registration for validation and runtime resolution.
-   * Constructor dependencies come from explicit decorator metadata, while array
-   * and map registrations append their collection item tokens as dependencies.
+   * Constructor dependencies come from explicit decorator metadata or legacy
+   * reflect metadata fallback, while array and map registrations append their
+   * collection item tokens as dependencies.
    * @returns A normalized registration.
    * @throws {Error} If constructor dependencies are missing or incomplete.
    */

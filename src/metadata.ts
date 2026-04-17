@@ -1,4 +1,9 @@
+import 'reflect-metadata';
 import { Abstract, Constructor, Lifetime, Token } from './interfaces.js';
+
+type ReflectWithMetadata = typeof Reflect & {
+  getMetadata?: (metadataKey: string, target: object) => unknown;
+};
 
 /**
  * Service metadata captured from decorators.
@@ -19,8 +24,8 @@ export interface ServiceMetadata {
 
 /**
  * Metadata abstraction used by the DI runtime.
- * Implementations own DI metadata directly instead of relying on global
- * reflect-metadata side effects.
+ * Implementations can prefer InjectKit's explicit metadata while still
+ * supporting legacy reflection metadata for backwards compatibility.
  */
 export interface MetadataRegistry {
   /**
@@ -53,7 +58,8 @@ export interface MetadataRegistry {
 }
 
 /**
- * Default metadata registry implementation for DI metadata and explicit constructor dependencies.
+ * Default metadata registry implementation for DI metadata, explicit constructor
+ * dependencies and legacy reflect-metadata fallback.
  */
 export class DefaultMetadataRegistry implements MetadataRegistry {
   /** Metadata is held weakly so decorated classes can still be garbage-collected. */
@@ -100,9 +106,10 @@ export class DefaultMetadataRegistry implements MetadataRegistry {
   }
 
   /**
-   * Resolves constructor dependency tokens from explicit decorator metadata.
-   * If a class has no dependency metadata, its base class is inspected so derived
-   * services can inherit dependency declarations from decorated base classes.
+   * Resolves constructor dependency tokens from explicit decorator metadata first,
+   * then from legacy reflect metadata when explicit deps are absent. If neither
+   * exists, base classes are inspected so derived services can inherit dependency
+   * declarations from decorated or reflected base classes.
    * Array and Map subclasses are treated as collection containers and do not need
    * constructor dependency declarations.
    * @param target The class or abstract class to inspect.
@@ -112,12 +119,17 @@ export class DefaultMetadataRegistry implements MetadataRegistry {
    */
   getConstructorDependencies(target: Constructor<unknown> | Abstract<unknown>, parents: string[] = []): Token<unknown>[] {
     const metadata = this.getServiceMetadata(target);
-    if (metadata?.deps) {
+    if (metadata?.deps !== undefined) {
       if (metadata.deps.length < target.length) {
         throw new Error(`Service dependencies incomplete: ${[...parents, target.name].join(' -> ')}`);
       }
 
       return [...metadata.deps];
+    }
+
+    const reflectedDependencies = this.getReflectConstructorDependencies(target, parents);
+    if (reflectedDependencies) {
+      return reflectedDependencies;
     }
 
     const baseClass = this.getBaseClass(target);
@@ -130,10 +142,39 @@ export class DefaultMetadataRegistry implements MetadataRegistry {
     }
 
     if (target.length > 0) {
-      throw new Error(`Service dependencies not declared: ${[...parents, target.name].join(' -> ')}`);
+      throw new Error(
+        `Service dependency metadata unavailable: ${[...parents, target.name].join(' -> ')}. ` +
+          'Declare deps with @Injectable({ deps: [...] }) or enable legacy reflection metadata with emitDecoratorMetadata and reflect-metadata.',
+      );
     }
 
     return [];
+  }
+
+  /**
+   * Reads TypeScript legacy design:paramtypes metadata when available.
+   * Explicit InjectKit deps are preferred by getConstructorDependencies(), so this
+   * fallback only runs for classes that did not opt into explicit metadata.
+   * @param target The class or abstract class to inspect.
+   * @param parents Parent class path used for diagnostics.
+   * @returns Reflected constructor dependencies, or undefined when no legacy metadata exists.
+   * @throws {Error} If reflected metadata exists but does not describe all required parameters.
+   */
+  private getReflectConstructorDependencies(target: Constructor<unknown> | Abstract<unknown>, parents: string[]): Token<unknown>[] | undefined {
+    const getMetadata = (Reflect as ReflectWithMetadata).getMetadata;
+    const reflected = getMetadata?.('design:paramtypes', target);
+    if (!Array.isArray(reflected)) {
+      return undefined;
+    }
+
+    if (reflected.length < target.length) {
+      throw new Error(
+        `Service dependency metadata incomplete: ${[...parents, target.name].join(' -> ')}. ` +
+          'Declare deps with @Injectable({ deps: [...] }) or enable legacy reflection metadata with emitDecoratorMetadata and reflect-metadata.',
+      );
+    }
+
+    return reflected as Token<unknown>[];
   }
 
   /**

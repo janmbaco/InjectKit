@@ -101,18 +101,50 @@ describe('Injectable decorator', () => {
     ]);
   });
 
-  it('should throw when dependencies are missing for a parameterized constructor', () => {
+  it('should read legacy reflect metadata when deps are omitted', () => {
     @Injectable()
     class DependencyService {}
 
     @Injectable()
-    class MissingDepsService {
+    class ReflectedService {
       constructor(public readonly dep: DependencyService) {}
     }
 
     const metadataRegistry = getDefaultMetadataRegistry();
-    expect(() => metadataRegistry.getConstructorDependencies(MissingDepsService)).toThrow(
-      /Service dependencies not declared/,
+    expect(metadataRegistry.getConstructorDependencies(ReflectedService)).toEqual([
+      DependencyService,
+    ]);
+  });
+
+  it('should prefer explicit deps over legacy reflect metadata', () => {
+    @Injectable()
+    class ReflectDependency {}
+
+    @Injectable()
+    class ExplicitDependency {}
+
+    @Injectable({ deps: [ExplicitDependency] })
+    class ExplicitService {
+      constructor(public readonly dep: ReflectDependency) {}
+    }
+
+    const metadataRegistry = getDefaultMetadataRegistry();
+    expect(metadataRegistry.getConstructorDependencies(ExplicitService)).toEqual([
+      ExplicitDependency,
+    ]);
+  });
+
+  it('should throw when dependencies are neither declared nor reflected', () => {
+    @Injectable()
+    class DependencyService {}
+
+    class MissingMetadataService {
+      constructor(public readonly dep: DependencyService) {}
+    }
+
+    const metadataRegistry = getDefaultMetadataRegistry();
+    expect(() => metadataRegistry.getConstructorDependencies(MissingMetadataService)).toThrow(
+      /Declare deps with @Injectable/,
     );
   });
 

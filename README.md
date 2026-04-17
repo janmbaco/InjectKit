@@ -23,7 +23,7 @@
 ## Features
 
 - 🎯 **Type-safe** — Full TypeScript support with strong typing throughout
-- 🪶 **Lightweight** — Minimal footprint with zero runtime dependencies
+- 🪶 **Lightweight** — Minimal footprint with backwards-compatible reflection support
 - 🔄 **Multiple lifetimes** — Singleton, transient, and scoped instance management
 - 🏭 **Flexible registration** — Classes, factories, or existing instances
 - 📦 **Collection support** — Register arrays and maps of implementations
@@ -47,8 +47,8 @@ yarn add injectkit
 ## Requirements
 
 - **Node.js** >= 22
-- Constructor dependencies must be declared explicitly with `@Injectable({ deps: [...] })`
-- InjectKit does not require `reflect-metadata` or `emitDecoratorMetadata`
+- Existing `reflect-metadata` / `emitDecoratorMetadata` constructor injection remains supported
+- Explicit dependency metadata with `@Injectable({ deps: [...] })` is supported and recommended for portability
 
 ## Quick Start
 
@@ -63,7 +63,7 @@ class Logger {
   }
 }
 
-@Injectable({ deps: [Logger] })
+@Injectable()
 class UserService {
   constructor(private logger: Logger) {}
 
@@ -85,6 +85,17 @@ const container = registry.build();
 const userService = container.get(UserService);
 userService.createUser('Alice');
 ```
+
+InjectKit now also supports explicit dependency metadata. This is useful for browser builds, bundlers, and codebases that prefer not to rely on emitted TypeScript metadata:
+
+```typescript
+@Injectable({ deps: [Logger] })
+class UserService {
+  constructor(private logger: Logger) {}
+}
+```
+
+Explicit deps take priority when both explicit and reflected metadata are available, so projects can migrate gradually.
 
 ## Browser Usage
 
@@ -142,10 +153,10 @@ const container = registry.build();
 
 ### Container
 
-The **Container** resolves and manages service instances at runtime. It injects dependencies declared with `@Injectable({ deps: [...] })`.
+The **Container** resolves and manages service instances at runtime. It injects dependencies from explicit `deps` metadata first, then falls back to legacy reflected constructor metadata.
 
 ```typescript
-// Resolve a service with its declared dependencies
+// Resolve a service with its configured dependencies
 const service = container.get(MyService);
 
 // The Container itself can be resolved for factory patterns
@@ -199,7 +210,21 @@ registry.register(TempCalculation).useClass(TempCalculation).asTransient();
 
 #### `useClass(constructor)`
 
-Register a service using its constructor. Constructor dependencies are resolved from `@Injectable({ deps: [...] })` metadata.
+Register a service using its constructor. Constructor dependencies are resolved from explicit `@Injectable({ deps: [...] })` metadata first, then from legacy reflected metadata when explicit deps are absent.
+
+```typescript
+@Injectable()
+class EmailService {
+  constructor(
+    private config: ConfigService,
+    private logger: Logger,
+  ) {}
+}
+
+registry.register(EmailService).useClass(EmailService).asSingleton();
+```
+
+For explicit, portable metadata:
 
 ```typescript
 @Injectable({ deps: [ConfigService, Logger] })
@@ -209,8 +234,6 @@ class EmailService {
     private logger: Logger,
   ) {}
 }
-
-registry.register(EmailService).useClass(EmailService).asSingleton();
 ```
 
 #### `useFactory(factory)`
@@ -375,7 +398,16 @@ const container = registry.build({
 
 ### Decorators
 
-Decorators can declare constructor dependencies and default lifetimes:
+Decorators can be used in the legacy style:
+
+```typescript
+@Injectable()
+class UserService {
+  constructor(private logger: Logger) {}
+}
+```
+
+They can also declare constructor dependencies and default lifetimes:
 
 ```typescript
 @Singleton({ deps: [Logger] })
@@ -468,7 +500,7 @@ registry.register(ServiceB).useClass(ServiceB).asSingleton();
 registry.build(); // ❌ Error: Circular dependency found: ServiceA -> ServiceB -> ServiceA
 ```
 
-### Missing Explicit Dependencies
+### Missing Dependency Metadata
 
 ```typescript
 @Injectable()
@@ -477,7 +509,9 @@ class MissingDepsService {
 }
 
 registry.register(MissingDepsService).useClass(MissingDepsService).asSingleton();
-registry.build(); // ❌ Error: Service dependencies not declared: MissingDepsService
+registry.build();
+// ❌ Error: Service dependency metadata unavailable: MissingDepsService.
+// Declare deps with @Injectable({ deps: [...] }) or enable legacy reflection metadata.
 ```
 
 ## Testing
@@ -515,18 +549,31 @@ describe('UserService', () => {
 
 Recommended `tsconfig.json` settings:
 
+For legacy reflected constructor injection:
+
 ```json
 {
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
     "strict": true
   }
 }
 ```
 
-Do not enable `emitDecoratorMetadata` for InjectKit; dependency metadata is provided explicitly through decorator options.
+For explicit deps, `emitDecoratorMetadata` is optional:
+
+```typescript
+@Injectable({ deps: [Logger] })
+class UserService {
+  constructor(private logger: Logger) {}
+}
+```
+
+You can mix both styles while migrating. Explicit deps win when both are present.
 
 ## License
 

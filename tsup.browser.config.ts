@@ -10,6 +10,7 @@ const browserConfig = {
     injectkit: 'dist/index.js',
   },
   format: ['esm'],
+  noExternal: ['reflect-metadata'],
   outDir: 'dist/browser',
   platform: 'browser',
   sourcemap: true,

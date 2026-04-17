@@ -16,7 +16,8 @@ export default defineProject({
           decorators: true,
         },
         transform: {
-          decoratorVersion: '2022-03',
+          decoratorMetadata: true,
+          legacyDecorator: true,
         },
       },
     }),

@@ -42,6 +42,26 @@ describe('build options', () => {
     expect(initializer.content.getTitle()).toBe('portfolio');
   });
 
+  it('should auto-register decorated classes with legacy reflect metadata', () => {
+    @Injectable()
+    class LegacyContentService {
+      getTitle() {
+        return 'legacy';
+      }
+    }
+
+    @Injectable()
+    class LegacyInitializer {
+      constructor(public readonly content: LegacyContentService) {}
+    }
+
+    const container = createRegistry().build({
+      autoRegisterDecorated: true,
+    });
+
+    expect(container.get(LegacyInitializer).content.getTitle()).toBe('legacy');
+  });
+
   it('should support registerValue for nominal tokens', () => {
     const container = createRegistry()
       .registerValue(CONFIG, { env: 'test' })

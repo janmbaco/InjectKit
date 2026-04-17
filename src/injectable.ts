@@ -9,7 +9,8 @@ const metadataRegistry = getDefaultMetadataRegistry();
 export interface ServiceDecoratorOptions {
   /**
    * Explicit constructor dependency tokens, in constructor parameter order.
-   * Required for decorated classes with constructor parameters.
+   * When omitted, InjectKit falls back to legacy reflect-metadata constructor
+   * metadata when it is available.
    */
   deps?: readonly Token<unknown>[];
 }
@@ -35,8 +36,8 @@ const applyServiceMetadata =
 
 /**
  * Marks a class as injectable and eligible for metadata-driven registration.
- * Classes with constructor parameters must declare explicit deps because
- * InjectKit does not read TypeScript emitDecoratorMetadata output.
+ * Classes can declare explicit deps for portability, or omit deps and keep using
+ * legacy emitDecoratorMetadata metadata for backwards compatibility.
  * @param options Optional explicit dependency metadata.
  * @returns A class decorator that marks the class as injectable.
  * @example
