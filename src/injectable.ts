@@ -3,7 +3,14 @@ import { getDefaultMetadataRegistry } from './metadata.js';
 
 const metadataRegistry = getDefaultMetadataRegistry();
 
+/**
+ * Options shared by service decorators.
+ */
 export interface ServiceDecoratorOptions {
+  /**
+   * Explicit constructor dependency tokens, in constructor parameter order.
+   * Required for decorated classes with constructor parameters.
+   */
   deps?: readonly Token<unknown>[];
 }
 
@@ -16,6 +23,7 @@ type ServiceMetadataOptions = ServiceDecoratorOptions & {
 const applyServiceMetadata =
   (metadata: ServiceMetadataOptions = {}): ClassDecorator =>
   <TFunction extends Function>(target: TFunction): TFunction => {
+    // Copy deps so callers cannot mutate stored metadata after decoration.
     metadataRegistry.defineServiceMetadata(target, {
       ...metadata,
       deps: metadata.deps ? [...metadata.deps] : undefined,
@@ -27,7 +35,17 @@ const applyServiceMetadata =
 
 /**
  * Marks a class as injectable and eligible for metadata-driven registration.
+ * Classes with constructor parameters must declare explicit deps because
+ * InjectKit does not read TypeScript emitDecoratorMetadata output.
+ * @param options Optional explicit dependency metadata.
  * @returns A class decorator that marks the class as injectable.
+ * @example
+ * ```typescript
+ * @Injectable({ deps: [Logger] })
+ * class UserService {
+ *   constructor(private logger: Logger) {}
+ * }
+ * ```
  */
 export const Injectable = (
   options: ServiceDecoratorOptions = {},
@@ -35,6 +53,8 @@ export const Injectable = (
 
 /**
  * Marks a class as injectable with singleton lifetime by default.
+ * The fluent registration API can still override this lifetime explicitly.
+ * @param options Optional explicit dependency metadata.
  * @returns A class decorator that marks the class as a singleton.
  */
 export const Singleton = (
@@ -44,6 +64,8 @@ export const Singleton = (
 
 /**
  * Marks a class as injectable with scoped lifetime by default.
+ * The fluent registration API can still override this lifetime explicitly.
+ * @param options Optional explicit dependency metadata.
  * @returns A class decorator that marks the class as scoped.
  */
 export const Scoped = (
@@ -53,6 +75,8 @@ export const Scoped = (
 
 /**
  * Marks a class as injectable with transient lifetime by default.
+ * The fluent registration API can still override this lifetime explicitly.
+ * @param options Optional explicit dependency metadata.
  * @returns A class decorator that marks the class as transient.
  */
 export const Transient = (
@@ -62,7 +86,10 @@ export const Transient = (
 
 /**
  * Declares the token satisfied by the decorated implementation.
- * @param token The token provided by the decorated class.
+ * Used by auto-registration to register the implementation under a class,
+ * abstract class, string or symbol token that differs from the class itself.
+ * @param token The runtime token provided by the decorated class.
+ * @param options Optional explicit dependency metadata.
  * @returns A class decorator that associates the class with the token.
  */
 export const Provider = (

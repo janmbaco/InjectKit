@@ -1,5 +1,7 @@
 import { defineConfig } from 'tsup';
 
+// Browser builds start from the compiled ESM output so declaration generation
+// stays owned by the normal Node/package build.
 const browserConfig = {
   bundle: true,
   clean: false,

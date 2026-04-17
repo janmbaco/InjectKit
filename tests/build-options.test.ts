@@ -50,6 +50,16 @@ describe('build options', () => {
     expect(container.get(CONFIG)).toEqual({ env: 'test' });
   });
 
+  it('should resolve falsy registered values', () => {
+    const container = createRegistry()
+      .registerValue('enabled', false)
+      .registerValue('retryCount', 0)
+      .build();
+
+    expect(container.get('enabled')).toBe(false);
+    expect(container.get('retryCount')).toBe(0);
+  });
+
   it('should support symbol tokens provided by decorators', () => {
     const container = createRegistry().build({
       autoRegisterDecorated: true,

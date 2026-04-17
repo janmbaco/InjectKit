@@ -8,6 +8,10 @@ import { pathToFileURL } from 'node:url';
 const repositoryRoot = process.cwd();
 const fixturePath = resolve(repositoryRoot, 'tests/fixtures/browser/browser-ready-smoke.html');
 
+/**
+ * Finds a Playwright-managed Chromium binary without requiring Playwright as a
+ * runtime dependency of the package. CI can still override this with CHROME_BIN.
+ */
 function findNewestPlaywrightBrowser(...relativeParts) {
   const cacheRoot = join(homedir(), '.cache', 'ms-playwright');
   if (!existsSync(cacheRoot)) {
@@ -34,6 +38,10 @@ function findNewestPlaywrightBrowser(...relativeParts) {
   return undefined;
 }
 
+/**
+ * Resolves the browser executable used by the smoke test.
+ * Explicit environment variables win over local Playwright cache discovery.
+ */
 function findBrowserExecutable() {
   const explicitCandidates = [process.env.CHROME_BIN, process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH].filter(Boolean);
 
@@ -59,6 +67,8 @@ async function main() {
 
   try {
     const smokeUrl = pathToFileURL(fixturePath).href;
+    // Load the fixture over file:// to prove the browser artifact works without
+    // a dev server, bundler or package resolver.
     const browserArgs = ['--no-sandbox', '--allow-file-access-from-files', '--virtual-time-budget=10000', '--dump-dom', smokeUrl];
 
     if (!isHeadlessShell) {
