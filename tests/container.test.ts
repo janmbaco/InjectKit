@@ -16,7 +16,7 @@ class LoggerService {
   }
 }
 
-@Injectable()
+@Injectable({ deps: [DatabaseService, LoggerService] })
 class UserService {
   constructor(
     public db: DatabaseService,
@@ -420,7 +420,7 @@ describe('InjectKitContainer', () => {
 
   describe('mixed lifetimes', () => {
     it('should handle mixed singleton and transient dependencies', () => {
-      @Injectable()
+      @Injectable({ deps: [DatabaseService, TransientService] })
       class MixedService {
         constructor(
           public singleton: DatabaseService,

@@ -1,15 +1,15 @@
 {
-  "name": "@janmbaco/injectkit",
-  "version": "1.2.0-jan.0",
+  "name": "injectkit",
+  "version": "1.2.0",
   "description": "Lightweight, type-safe dependency injection container for TypeScript with constructor injection, factory functions, and lifetime management.",
   "author": {
-    "name": "Jan Baco",
-    "url": "https://github.com/janmbaco/InjectKit"
+    "name": "Marooned Software",
+    "url": "https://github.com/MaroonedSoftware/injectkit"
   },
   "bugs": {
-    "url": "https://github.com/janmbaco/InjectKit/issues"
+    "url": "https://github.com/MaroonedSoftware/injectkit/issues"
   },
-  "homepage": "https://github.com/janmbaco/InjectKit#readme",
+  "homepage": "https://github.com/MaroonedSoftware/injectkit#readme",
   "keywords": [
     "dependency injection",
     "inversion of control",
@@ -22,15 +22,25 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/janmbaco/InjectKit.git"
-  },
-  "publishConfig": {
-    "access": "public"
+    "url": "https://github.com/MaroonedSoftware/injectkit.git"
   },
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/browser/injectkit.js",
+      "default": "./dist/browser/injectkit.js"
+    },
+    "./package.json": "./package.json"
+  },
   "license": "MIT",
   "files": [
     "dist/**"
@@ -40,15 +50,17 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --sourcemap --dts && tsc --emitDeclarationOnly --declaration",
+    "build": "pnpm run build:browser",
+    "build:esm": "tsup src/index.ts --format esm --sourcemap --dts && tsc --emitDeclarationOnly --declaration",
+    "build:browser": "pnpm run build:esm && tsup --config tsup.browser.config.ts",
     "build:ci": "eslint --max-warnings=0 && pnpm run build",
     "changeset": "changeset && changeset version",
     "lint": "eslint --fix",
     "format": "prettier --write . ",
     "test": "vitest run",
-    "test:ci": "vitest run --coverage "
+    "test:browser": "pnpm run build:browser && node tests/browser/browser-ready-smoke.mjs",
+    "test:ci": "vitest run --coverage && pnpm run test:browser"
   },
-  "dependencies": {},
   "devDependencies": {
     "@changesets/cli": "^2.30.0",
     "@eslint/js": "^10.0.1",

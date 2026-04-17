@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createRegistry,
   Injectable,
-  Provides,
+  Provider,
   Singleton,
 } from '../src/index.js';
 
@@ -17,7 +17,7 @@ class Logger {
 }
 
 @Singleton()
-@Provides(LOGGER)
+@Provider(LOGGER)
 class LoggerProvider extends Logger {}
 
 @Injectable()
@@ -27,7 +27,7 @@ class HomeContentService {
   }
 }
 
-@Injectable()
+@Injectable({ deps: [HomeContentService] })
 class HomeInitializer {
   constructor(public readonly content: HomeContentService) {}
 }
@@ -55,7 +55,9 @@ describe('build options', () => {
       autoRegisterDecorated: true,
     });
 
-    expect(container.get(LOGGER).log('hello')).toBe('log:hello');
+    const logger = container.get(LOGGER);
+    expect(logger).toBeInstanceOf(LoggerProvider);
+    expect(logger.log('hello')).toBe('log:hello');
   });
 
   it('should allow overrides to replace decorated registrations', () => {

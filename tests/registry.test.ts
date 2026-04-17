@@ -9,7 +9,7 @@ class SimpleService {
   }
 }
 
-@Injectable()
+@Injectable({ deps: [SimpleService] })
 class DependentService {
   constructor(public simple: SimpleService) {}
 
@@ -18,7 +18,7 @@ class DependentService {
   }
 }
 
-@Injectable()
+@Injectable({ deps: [DependentService] })
 class DeepDependentService {
   constructor(public dependent: DependentService) {}
 
@@ -50,27 +50,27 @@ abstract class ITestCircularService4 {}
 
 abstract class ITestCircularService5 {}
 
-@Injectable()
+@Injectable({ deps: [ITestCircularService2] })
 class TestCircularService1 implements ITestCircularService1 {
   constructor(public dependency: ITestCircularService2) {}
 }
 
-@Injectable()
+@Injectable({ deps: [ITestCircularService1] })
 class TestCircularService2 implements ITestCircularService2 {
   constructor(public dependency: ITestCircularService1) {}
 }
 
-@Injectable()
+@Injectable({ deps: [ITestCircularService4] })
 class TestCircularService3 implements ITestCircularService3 {
   constructor(public dependency: ITestCircularService4) {}
 }
 
-@Injectable()
+@Injectable({ deps: [ITestCircularService5] })
 class TestCircularService4 implements ITestCircularService4 {
   constructor(public dependency: ITestCircularService5) {}
 }
 
-@Injectable()
+@Injectable({ deps: [ITestCircularService3] })
 class TestCircularService5 implements ITestCircularService5 {
   constructor(public dependency: ITestCircularService3) {}
 }
@@ -415,7 +415,7 @@ describe('InjectKitRegistry', () => {
 
       registry.register(SimpleService).useClass(SimpleService).asSingleton();
       registry.register(UndecoratedService).useClass(UndecoratedService).asSingleton();
-      expect(() => registry.build()).toThrow(/Service not decorated/);
+      expect(() => registry.build()).toThrow(/Service dependencies not declared/);
     });
 
     it('should allow undecorated class with no dependencies', () => {

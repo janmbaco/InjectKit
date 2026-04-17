@@ -1,149 +1,122 @@
-# InjectKit
+# Injectkit
 
-> Lightweight, type-safe dependency injection container for TypeScript with explicit composition, useful decorators, and build-time validation.
+> A lightweight, type-safe dependency injection container for TypeScript with constructor injection, factory functions, and lifetime management.
 
 ## Requirements
 
 - TypeScript with `experimentalDecorators: true` and `emitDecoratorMetadata: true`
-- No `reflect-metadata` import is required at application entry point
+- Import `reflect-metadata` at application entry point
 
 ## Core Concepts
 
 - **Registry**: Configuration phase where services are registered before building a container
 - **Container**: Runtime phase that resolves and manages service instances
-- **Token**: Runtime key used to register and resolve services; supports class, abstract class, string, and symbol
-- **Lifetime**: `singleton`, `transient`, or `scoped`
-- **MetadataRegistry**: Internal metadata source used by decorators and `build()`
+- **Identifier**: A class constructor or abstract class used to register and resolve services
+- **Lifetime**: How long instances live - singleton (shared), transient (new each time), or scoped (per scope)
 
 ## Public API
 
 ### Exports
 
-- `Injectable()` - Marks a class as injectable and eligible for metadata-driven registration
-- `Singleton()` - Marks a class as injectable with singleton lifetime
-- `Scoped()` - Marks a class as injectable with scoped lifetime
-- `Transient()` - Marks a class as injectable with transient lifetime
-- `Provides(token)` - Associates an implementation with a token
-- `InjectKitRegistry` - Registry class for explicit registrations
-- `createRegistry()` - Convenience factory for registry creation
-- `Container` - Abstract container class with `get()` and `createScopedContainer()`
-- `getDefaultMetadataRegistry()` - Shared metadata registry used by decorators
+- `Injectable()` - Decorator marking classes for DI (required for `useClass()` registrations)
+- `InjectKitRegistry` - Registry class for configuring service registrations
+- `Container` - Abstract container class with `get()` and `createScopedContainer()` methods
 
 ### Types
 
-- `Token<T>` - `class | abstract class | string | symbol`
-- `Identifier<T>` - Backward-compatible alias of `Token<T>`
-- `Container` - Base container API
-- `ScopedContainer` - Container with `override()` support
-- `Factory<T>` - Function `(container: Container) => T`
+- `Identifier<T>` - Constructor or abstract class used as service key
+- `Container` - Base container interface
+- `ScopedContainer` - Container with `override()` method for scoped instances
+- `Factory<T>` - Function `(container: Container) => T` for factory registrations
 - `Lifetime` - `'singleton' | 'transient' | 'scoped'`
-- `BuildOptions` - `{ autoRegisterDecorated?: boolean; overrides?: Override[] }`
-- `Override` - `useClass`, `useFactory`, or `useValue` override descriptor
 
 ## Registration Patterns
 
-### Explicit class registration
-
+### Class Registration
 ```typescript
 registry.register(ServiceClass).useClass(ServiceClass).asSingleton();
 ```
 
-### Value registration
-
+### Factory Registration
 ```typescript
-registry.registerValue(CONFIG_TOKEN, config);
+registry.register(ServiceClass).useFactory((container) => new ServiceClass()).asSingleton();
 ```
 
-### Factory registration
-
+### Instance Registration
 ```typescript
-registry.registerFactory(ServiceToken, container => new Service(container.get(Dep)), 'singleton');
+registry.register(ServiceClass).useInstance(existingInstance);
 ```
 
-### Decorator-driven build
-
+### Array Collection
 ```typescript
-@Singleton()
-class Logger {}
-
-@Injectable()
-class UserService {
-  constructor(private readonly logger: Logger) {}
-}
-
-const container = createRegistry().build({
-  autoRegisterDecorated: true,
-});
+registry.register(ServiceArray).useArray(ServiceArray).push(ImplA).push(ImplB);
 ```
 
-### Token-driven registration
-
+### Map Collection
 ```typescript
-const LOGGER = Symbol('LOGGER');
-
-@Singleton()
-@Provides(LOGGER)
-class ConsoleLogger {}
+registry.register(ServiceMap).useMap(ServiceMap).set('key1', ImplA).set('key2', ImplB);
 ```
 
-### Overrides at build time
+## Lifetime Options
 
-```typescript
-const container = createRegistry().build({
-  autoRegisterDecorated: true,
-  overrides: [{ token: LOGGER, useClass: TestLogger, lifetime: 'singleton' }],
-});
-```
+- `.asSingleton()` - One instance shared across all containers
+- `.asTransient()` - New instance on every `get()` call
+- `.asScoped()` - One instance per scope, inherited by child scopes
 
 ## Container Methods
 
-- `container.get(Token)` - Resolve a service instance
-- `container.createScopedContainer()` - Create a child scope
-- `scopedContainer.override(Token, instance)` - Override a registration in a scoped container
-- `container.hasRegistration(Token)` - Check whether a token is registered
+- `container.get(Identifier)` - Resolve a service instance
+- `container.createScopedContainer()` - Create child container for scoped services
+- `scopedContainer.override(Identifier, instance)` - Override registration in scope
 
 ## Registry Methods
 
-- `registry.register(Token)` - Start fluent registration
-- `registry.registerValue(Token, value)` - Register a concrete value
-- `registry.registerFactory(Token, factory, lifetime?)` - Register a factory directly
-- `registry.remove(Token)` - Remove a registration
-- `registry.isRegistered(Token)` - Check whether a token is registered
-- `registry.build(options?)` - Merge explicit registrations, metadata-driven registrations, and overrides
+- `registry.register(Identifier)` - Start registration chain
+- `registry.remove(Identifier)` - Remove a registration
+- `registry.isRegistered(Identifier)` - Check if service is registered
+- `registry.build()` - Build container from registrations (validates dependencies)
 
-## Validation
+## Validation (on build)
 
-- Missing dependencies throw on `build()`
-- Circular dependencies throw on `build()`
-- Constructor-injected classes still require decorator metadata to be available
-- Explicit registrations take precedence over metadata-driven registrations
-- Overrides take precedence over both
+- Missing dependencies throw error
+- Circular dependencies detected and reported
+- Classes without `@Injectable()` decorator rejected
 
 ## Usage Example
 
 ```typescript
-import {
-  Injectable,
-  Singleton,
-  InjectKitRegistry,
-  createRegistry,
-} from '@janmbaco/injectkit';
+import 'reflect-metadata';
+import { Injectable, InjectKitRegistry } from 'injectkit';
 
-@Singleton()
+@Injectable()
 class Logger {
-  log(msg: string) {
-    console.log(msg);
-  }
+    log(msg: string) { console.log(msg); }
 }
 
 @Injectable()
 class UserService {
-  constructor(private readonly logger: Logger) {}
+    constructor(private logger: Logger) {}
+    getUsers() { this.logger.log('Fetching users'); }
 }
 
-const container = createRegistry().build({
-  autoRegisterDecorated: true,
-});
+const registry = new InjectKitRegistry();
+registry.register(Logger).useClass(Logger).asSingleton();
+registry.register(UserService).useClass(UserService).asSingleton();
 
-container.get(UserService);
+const container = registry.build();
+const userService = container.get(UserService);
 ```
+
+## Abstract Class Pattern
+
+Register abstract classes with concrete implementations:
+```typescript
+abstract class Repository { abstract find(id: string): any; }
+
+@Injectable()
+class UserRepository extends Repository { find(id: string) { return null; } }
+
+registry.register(Repository).useClass(UserRepository).asSingleton();
+const repo = container.get(Repository); // Returns UserRepository instance
+```
+
