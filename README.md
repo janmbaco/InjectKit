@@ -1,6 +1,7 @@
 # InjectKit
 
-[![codecov](https://codecov.io/github/MaroonedSoftware/InjectKit/graph/badge.svg?token=suXBzveqVf)](https://codecov.io/github/MaroonedSoftware/InjectKit)
+This package is a personal npm fork of InjectKit published as `@janmbaco/injectkit`.
+The upstream project is maintained by Marooned Software at `MaroonedSoftware/InjectKit`.
 
 ---
 
@@ -33,15 +34,15 @@
 ## Installation
 
 ```bash
-npm install injectkit
+npm install @janmbaco/injectkit
 ```
 
 ```bash
-pnpm add injectkit
+pnpm add @janmbaco/injectkit
 ```
 
 ```bash
-yarn add injectkit
+yarn add @janmbaco/injectkit
 ```
 
 ## Requirements
@@ -53,7 +54,7 @@ yarn add injectkit
 ## Quick Start
 
 ```typescript
-import { Injectable, InjectKitRegistry } from 'injectkit';
+import { Injectable, InjectKitRegistry } from '@janmbaco/injectkit';
 
 // 1. Decorate your classes with @Injectable()
 @Injectable()
@@ -127,7 +128,7 @@ InjectKit also ships a browser-ready ESM build for direct `<script type="module"
 </script>
 ```
 
-The npm package exposes the browser build as `injectkit/browser`.
+The npm package exposes the browser build as `@janmbaco/injectkit/browser`.
 
 ## Core Concepts
 

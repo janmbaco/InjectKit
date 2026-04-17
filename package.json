@@ -1,15 +1,15 @@
 {
-  "name": "injectkit",
-  "version": "1.2.0",
+  "name": "@janmbaco/injectkit",
+  "version": "1.2.0-jan.1",
   "description": "Lightweight, type-safe dependency injection container for TypeScript with constructor injection, factory functions, and lifetime management.",
   "author": {
-    "name": "Marooned Software",
-    "url": "https://github.com/MaroonedSoftware/injectkit"
+    "name": "janmbaco",
+    "url": "https://github.com/janmbaco"
   },
   "bugs": {
-    "url": "https://github.com/MaroonedSoftware/injectkit/issues"
+    "url": "https://github.com/janmbaco/InjectKit/issues"
   },
-  "homepage": "https://github.com/MaroonedSoftware/injectkit#readme",
+  "homepage": "https://github.com/janmbaco/InjectKit#readme",
   "keywords": [
     "dependency injection",
     "inversion of control",
@@ -22,7 +22,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/MaroonedSoftware/injectkit.git"
+    "url": "https://github.com/janmbaco/InjectKit.git"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -46,6 +46,10 @@
   "files": [
     "dist/**"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "packageManager": "pnpm@10.26.1",
   "engines": {
     "node": ">=22"
